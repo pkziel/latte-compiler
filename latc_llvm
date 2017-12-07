@@ -1,0 +1,7 @@
+#!/bin/bash
+pathToFile=$(dirname $1)
+fileName=$(basename $1)
+fileName=${fileName%.*}
+
+./src/compiler $fileName < $1 > $pathToFile/$fileName.ll
+llvm-as $pathToFile/$fileName.ll

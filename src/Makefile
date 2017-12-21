@@ -1,8 +1,9 @@
 all:
-	bnfc Latte.cf
+	bnfc Latte.cf 
 	happy -gca ParLatte.y
 	alex -g LexLatte.x
-	ghc compiler.hs
+	ghc Utils.hs
+	ghc Compiler.hs
 clean:
 	-rm -f *.log *.aux *.hi *.o *.dvi
 distclean: clean

@@ -3,5 +3,10 @@ pathToFile=$(dirname $1)
 fileName=$(basename $1)
 fileName=${fileName%.*}
 
-./src/compiler $fileName < $1 > $pathToFile/$fileName.ll
-llvm-as $pathToFile/$fileName.ll
+result=$(./src/Compiler $fileName $1)
+
+if [[ $result != "" ]]
+then	
+	echo $result > $pathToFile/$fileName.ll
+	llvm-as $pathToFile/$fileName.ll
+fi

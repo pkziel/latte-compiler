@@ -1,0 +1,7 @@
+/* bad signature */
+
+void main() {
+  foo();
+  return 0 ;
+
+}

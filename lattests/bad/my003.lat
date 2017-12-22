@@ -1,0 +1,9 @@
+/* printInt predifined */
+
+int main() {
+  return 0;
+}
+
+void printInt(int a){
+	
+}

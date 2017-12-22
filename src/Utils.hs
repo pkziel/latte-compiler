@@ -5,6 +5,7 @@ module Utils (
 import System.Exit
 import System.IO
 
+
 throwError :: String -> IO()
 throwError err = do
     hPutStrLn stderr ("ERROR\n" ++ err)

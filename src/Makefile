@@ -4,6 +4,7 @@ all:
 	alex -g LexLatte.x
 	ghc Utils.hs
 	ghc Compiler.hs
+	ghc TypeChecker.hs
 clean:
 	-rm -f *.log *.aux *.hi *.o *.dvi
 distclean: clean

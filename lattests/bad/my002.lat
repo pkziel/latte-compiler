@@ -1,0 +1,7 @@
+/* bad signature */
+
+int main(int a) {
+  foo();
+  return 0 ;
+
+}

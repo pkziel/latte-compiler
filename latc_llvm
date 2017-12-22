@@ -3,7 +3,7 @@ pathToFile=$(dirname $1)
 fileName=$(basename $1)
 fileName=${fileName%.*}
 
-result=$(./src/Compiler $fileName $1)
+result=$(./src/Compiler $1)
 
 if [[ $result != "" ]]
 then	

@@ -1,0 +1,14 @@
+/* f without return */
+
+int main() {
+	return 0;
+}
+
+boolean f() {
+	if (5>4) {
+		return "fafa";
+	}
+	else {
+		int x = 3;
+	}
+}

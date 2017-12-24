@@ -1,0 +1,4 @@
+/* function main without return */
+
+int main() {
+}

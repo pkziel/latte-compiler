@@ -39,7 +39,7 @@ getFunctionsDef topDefs = do
     case M.lookup (Ident "main") fenv of
         Nothing -> fail "No function named 'main'"
         Just ([], Int) -> return fenv
-        _ -> fail $ "Bad signature for 'main' function"
+        _ -> fail "Bad signature for 'main' function"
 
 -- predifined functions added to env during init
 emptyFEnv :: FEnv
@@ -67,11 +67,41 @@ runCheckFunction fenv (h:t) = do
         Right _ -> runCheckFunction fenv t
   
 checkFunction :: TopDef -> Mem ()
-checkFunction f@(FnDef t id@(Ident s) args block) = do
+checkFunction f@(FnDef t id@(Ident s) args (Block stmts)) = do
     store <- foldM (addArg s) M.empty args
+    -- wasReturnInEveryPath <- funReturnProperly stmts t False
+    -- case wasReturnInEveryPath of
+    --     False -> fail $ "Function " ++ s ++ " should return parameter " ++ (show t)
+    --     True -> do 
+    returnsProperly <- foldM (checkStmt t) False stmts
+    case returnsProperly of
+        True -> return ()
+        False -> fail $ "Function " ++ s ++ " should return parameter " ++ (show t)
+
     return ()
 
 addArg :: String -> VEnv -> Arg -> Mem VEnv
 addArg fun_id m (Arg t id@(Ident id_)) = case (M.lookup id m) of
     Nothing -> return (M.insert id t m)
     Just _ -> fail $ "Two arguments with same name '" ++ id_ ++ "' in function " ++ fun_id
+
+-- funReturnProperly :: [Stmt] -> Type -> Bool -> Mem Bool
+-- funReturnProperly _ Void _ = return True
+-- funReturnProperly _ _ True = return True
+-- funReturnProperly [] _ toReturn = return toReturn
+-- funReturnProperly ((CondElse e s1 s2) : t) type_ _ = do
+--     shouldGoDeeper1 <- funReturnProperly [s1] type_ False
+--     shouldGoDeeper2 <- funReturnProperly [s2] type_ False
+--     funReturnProperly t type_ (shouldGoDeeper1 && shouldGoDeeper2)
+-- funReturnProperly ((BStmt (Block stmts)) : t) type_ _ = do
+--     shouldGoDeeper <- funReturnProperly stmts type_ False
+--     funReturnProperly t type_ shouldGoDeeper
+-- funReturnProperly ((Ret e) : t) type_ _ = do
+--     shouldGoDeeper <- checkExpr
+--     funReturnProperly t type_ shouldGoDeeper
+-- funReturnProperly (_ : t) type_ r = funReturnProperly t type_ r
+
+-- checkExpr= return True
+
+checkStmt :: Type -> Bool -> Stmt -> Mem Bool
+checkStmt _ _ _ = fail "dupa"

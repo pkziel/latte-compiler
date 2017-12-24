@@ -12,15 +12,14 @@ import Utils
 
 compile :: String -> IO ()
 compile s = case pProgram (myLexer s) of
-    Bad err -> throwError err
-    Ok tree -> case typeCheck tree of
-        Bad err -> do throwError err
-        Ok _ -> putStrLn "OK"
+    Bad err -> throwMyError err
+    Ok tree -> typeCheck tree
+
 
 main :: IO ()
 main = do
     arg <- getArgs
     x <- case arg of 
-        (f:_) -> do readFile f
-        otherwise -> do getContents
+        (f:_) -> readFile f
+        otherwise -> getContents
     compile x

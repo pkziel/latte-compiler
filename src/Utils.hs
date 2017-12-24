@@ -1,12 +1,12 @@
 module Utils (
-    throwError
+    throwMyError, putErrorInStderr
 ) where
 
 import System.Exit
 import System.IO
 
-
-throwError :: String -> IO()
-throwError err = do
+throwMyError err = do
     hPutStrLn stderr ("ERROR\n" ++ err)
     exitFailure
+
+putErrorInStderr err = hPutStrLn stderr ("ERROR\n" ++ err)

@@ -1,7 +1,8 @@
 all:
-	bnfc Latte.cf 
+	../lib/bnfc-176-source-position/source/dist/build/bnfc/bnfc --functor Latte.cf 
 	happy -gca ParLatte.y
 	alex -g LexLatte.x
+	ghc --make TestLatte.hs -o TestLatte
 	ghc Utils.hs
 	ghc Compiler.hs
 	ghc TypeChecker.hs

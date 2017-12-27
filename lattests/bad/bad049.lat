@@ -1,0 +1,8 @@
+// applying ! to non bool
+
+int main(){
+	if(!5){
+	;
+	}
+	return 0;
+}

@@ -1,0 +1,6 @@
+// mul no int
+
+int main(){
+	5*true;
+	return 0;
+}

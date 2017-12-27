@@ -1,0 +1,6 @@
+// unknown function invoked
+
+int main(){
+	b();
+	return 0;
+}

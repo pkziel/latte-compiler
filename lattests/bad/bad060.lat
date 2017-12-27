@@ -1,0 +1,8 @@
+// || not bool
+
+int main(){
+	if (true || 5){
+	;
+	}
+	return 0;
+}

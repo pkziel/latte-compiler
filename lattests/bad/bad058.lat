@@ -1,0 +1,6 @@
+// sub no int
+
+int main(){
+	"a" - "b";
+	return 0;
+}

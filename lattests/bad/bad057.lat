@@ -1,0 +1,8 @@
+// adding no string or int
+
+int main(){
+	"a" + "b";
+	5+5;
+	5 + "str";
+	return 0;
+}

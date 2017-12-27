@@ -1,7 +1,7 @@
 // negating non int exp
 
 int main(){
-	if(-true){
+	if(a){
 	;
 	}
 	return 0;

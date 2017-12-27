@@ -1,0 +1,12 @@
+// 2 declaration of functions with same names
+
+int main(){
+	return 0;
+}
+
+int f(){
+	return 0;
+}
+
+void f(int a){
+}

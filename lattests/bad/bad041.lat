@@ -1,0 +1,7 @@
+// incrementing non int type 
+
+int main(){
+	boolean a = true;
+	a++;
+	return 0;
+}

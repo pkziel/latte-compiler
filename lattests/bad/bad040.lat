@@ -1,0 +1,6 @@
+// decrementing non existing
+
+int main(){
+	i--;
+	return 0;
+}

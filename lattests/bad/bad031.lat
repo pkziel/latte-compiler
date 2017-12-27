@@ -1,0 +1,9 @@
+// declaration of built-in function
+
+int main(){
+	return 0;
+}
+
+void printInt(int par) {
+	
+}

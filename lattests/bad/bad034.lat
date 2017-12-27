@@ -1,0 +1,7 @@
+//same name parameters
+
+int main(){
+	return 0;
+}
+
+void f(int a, void a){}

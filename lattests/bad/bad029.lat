@@ -1,0 +1,5 @@
+// bad signature for main
+
+int main(int a){
+	return 0;
+}

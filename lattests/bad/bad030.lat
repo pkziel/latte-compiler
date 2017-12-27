@@ -1,0 +1,4 @@
+// bad signature for main
+
+void main(){
+}

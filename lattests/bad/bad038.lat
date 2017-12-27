@@ -1,0 +1,7 @@
+// assigning wrong type expression
+
+int main(){
+	int local;
+	local = "super";
+	return 0;
+}

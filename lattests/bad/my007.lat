@@ -1,9 +1,0 @@
-/* f returning bad type */
-
-int main() {
-	return 0;
-}
-
-String f() {
-	return void;
-}

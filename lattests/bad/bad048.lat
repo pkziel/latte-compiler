@@ -1,0 +1,9 @@
+// non bool in while
+
+int main(){
+	while (5){
+		;
+	}
+
+	return 0;
+}

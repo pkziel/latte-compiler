@@ -1,9 +1,0 @@
-/* two arguments with same id */
-
-int main() {
-  return 0 ;
-}
-
-void f(int a, int a){
-
-}

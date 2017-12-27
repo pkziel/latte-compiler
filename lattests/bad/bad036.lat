@@ -1,0 +1,5 @@
+// declaration with wrong types
+int main(){
+	int a = "holly dolly";
+	return 0;
+}

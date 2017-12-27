@@ -1,0 +1,9 @@
+// non bool in if
+
+int main(){
+	if (5){
+		;
+	}
+
+	return 0;
+}

@@ -1,0 +1,10 @@
+//variable declared in scope
+
+int main(){
+	return 0;
+}
+
+void f(){
+	int a;
+	void a;
+}

@@ -1,0 +1,7 @@
+// decrementing non int 
+
+int main(){
+	boolean a = true;
+	a--;
+	return 0;
+}

@@ -1,0 +1,12 @@
+// non bool in if-else
+
+int main(){
+	if (5){
+		;
+	}
+	else{
+		;
+	}
+
+	return 0;
+}

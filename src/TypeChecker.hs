@@ -27,6 +27,7 @@ typeCheck (Program _ topDefs) = case getFunctionsDef topDefs of
     Bad err -> putErrorInStderr err
     Ok fenv -> runCheckFunction fenv topDefs
 
+-- firstly add functions to env
 getFunctionsDef :: [(TopDef Liner)] -> Err (FEnv Liner)
 getFunctionsDef topDefs = do
     fenv <- foldM (updateFun) emptyFEnv topDefs
@@ -83,7 +84,9 @@ checkStmt _ b (Empty _) = return b
 checkStmt t b (BStmt _ (Block _ block)) = do
     s <- get
     put (M.empty:s)
-    foldM (checkStmt t) b block
+    b <- foldM (checkStmt t) b block
+    put s
+    return b
 checkStmt _ b (Decl _ t items) = do
    forM items (checkItem t)
    return b

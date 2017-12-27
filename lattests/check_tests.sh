@@ -31,9 +31,9 @@ for i in $PWD/lattests/good/*.lat; do
     fi
 done
 
-let "rr = 60 - $counter"
+let "rr = 61 - $counter"
 echo
-echo Testy bad '-->' '('poprawne/wszystkie')' $rr / 60
+echo Testy bad '-->' '('poprawne/wszystkie')' $rr / 61
 echo Testy good '-->' '('poprawne/wszystkie')' $counter1 / 22
 
 rm -f lattests/bad/*.ll

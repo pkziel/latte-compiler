@@ -1,5 +1,5 @@
 module Utils (
-    throwMyError, putErrorInStderr, isInt, isVoid, isBool, isStr, 
+    throwMyError, putErrorInStderr, throwMySuccess, isInt, isVoid, isBool, isStr, 
     sameType, addLine, showMy, fromType, errNoMain, errBadSignature,
     errFunctionExists, errFunctionShouldReturn, errArgsWithSameName,
     errVarNotDecl, errAssType, errActionBadType, errExpectedReturnType,
@@ -33,9 +33,11 @@ putErrorInStderr err = hPutStrLn stderr ("ERROR\n" ++ err)
 addLine (Just (a,b)) = "\nError found in " ++ show(a) ++ ":" ++ show(b)  
 addLine Nothing = ""
 
+throwMySuccess = hPutStrLn stderr ("OK")
+
 -- functions returning err messages
 errNoMain :: Err (FEnv Liner)
-errNoMain = fail "No function named 'main'"
+errNoMain = fail "Function 'main' not found"
 
 errBadSignature :: Err (FEnv Liner)
 errBadSignature = fail "Bad signature for 'main' function"

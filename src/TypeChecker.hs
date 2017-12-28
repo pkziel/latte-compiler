@@ -1,8 +1,7 @@
--- author: Piotr Zieliński
 -- read top -> bottom
 
 module TypeChecker (
-    typeCheck
+    typeCheck, Liner
 ) where
 
 import qualified Data.Map as M
@@ -47,14 +46,22 @@ emptyFEnv = M.fromList [
 
 updateFun :: (FEnv Liner) -> (TopDef Liner) -> Err (FEnv Liner)
 updateFun fenv (FnDef line t id@(Ident s) args _) = case M.lookup id fenv of
-    Nothing -> return $ (M.insert id ( types args, t) fenv)
     Just _ -> errFunctionExists s line
+    Nothing -> case checkNullArgs args of 
+        True -> fail $ "Function can't take void parameters" ++ (addLine line)
+        False -> return $ (M.insert id ( types args, t) fenv)
     where
         types _args = map (\(Arg _ t _) -> t) _args
 
+checkNullArgs :: [(Arg Liner)] -> Bool
+checkNullArgs [] = False
+checkNullArgs ((Arg _ b _) : t ) = case b of
+    (Void _) -> True
+    _ -> checkNullArgs t
+
 -- -- secondly we can check body of evsery single function
 runCheckFunction :: (FEnv Liner) -> [(TopDef Liner)] -> IO()
-runCheckFunction _ [] = putStrLn ("Ok\n")
+runCheckFunction _ [] = throwMySuccess
 runCheckFunction fenv (h:t) = do
     r <- evalStateT (runErrorT (runReaderT (checkFunction h) fenv)) []
     case r of
@@ -87,9 +94,12 @@ checkStmt t b (BStmt _ (Block _ block)) = do
     b <- foldM (checkStmt t) b block
     put s
     return b
-checkStmt _ b (Decl _ t items) = do
-   forM items (checkItem t)
-   return b
+checkStmt _ b (Decl line t items) = do
+    case t of
+        (Void _) -> fail $ "Declaring variable with void type" ++ (addLine line)
+        _ -> do
+            forM items (checkItem t)
+            return b
 checkStmt _ b (Ass line id@(Ident i) exp) = do 
     exp_type <- infer exp
     s <- get
@@ -114,9 +124,11 @@ checkStmt _ b (Decr line id@(Ident i)) = do
             False -> errActionBadType "Decrementing" i line
 checkStmt t _ (Ret line exp) = do
     exp_type <- infer exp
-    case (sameType t exp_type) of
-        True -> return True
-        False -> errExpectedReturnType t (showMy exp_type) line
+    case exp_type of
+        (Void _) -> fail $ "Returning void value" ++ addLine(line)
+        _ -> case (sameType t exp_type) of
+            True -> return True
+            False -> errExpectedReturnType t (showMy exp_type) line
 checkStmt t _ (VRet line) =
     case (isVoid t) of
         True -> return True
@@ -186,7 +198,9 @@ infer :: (Expr Liner) -> Mem (Type Liner) Liner
 infer (ELitTrue _) = return (Bool Nothing)
 infer (ELitFalse _) = return (Bool Nothing)
 infer (EString _ _) = return (Str Nothing)
-infer (ELitInt _ _) = return (Int Nothing)
+infer (ELitInt line i) = case (i >  2147483647 || i < -2147483648) of
+    True -> fail $ "Int const used in exp is not in range (-2147483648, 2147483647) " ++ (addLine line)
+    False -> return (Int Nothing)
 infer (Not line exp) = do
     exp_type <- infer exp
     case (isBool exp_type) of

@@ -1,0 +1,9 @@
+// void as paramter
+
+int main(){
+	return 0;
+}
+
+int f(void x){
+	return 0;
+}

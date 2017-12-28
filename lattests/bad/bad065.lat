@@ -1,0 +1,6 @@
+// int too big :(
+
+int main(){
+	int x = 9999999999999;
+	return 0;
+}

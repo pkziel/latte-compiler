@@ -1,3 +1,5 @@
+-- author: Piotr Zieliński
+
 module Main where
 
 import System.Environment
@@ -6,14 +8,8 @@ import ErrM
 import ParLatte
 
 import TypeChecker
+import AbsLatte
 import Utils
-
-
-compile :: String -> IO ()
-compile s = case pProgram (myLexer s) of
-    Bad err -> throwMyError err
-    Ok tree -> typeCheck tree
-
 
 main :: IO ()
 main = do
@@ -22,3 +18,13 @@ main = do
         (f:_) -> readFile f
         otherwise -> getContents
     compile x
+
+compile :: String -> IO ()
+compile s = case pProgram (myLexer s) of
+    Bad err -> throwMyError err
+    Ok tree -> do
+    	typeCheck tree
+    	generateCode tree
+
+generateCode :: (Program Liner) -> IO()
+generateCode (Program _ topDefs) = putStrLn ("Ok\n")

@@ -31,6 +31,7 @@ int readInt() {
     return x;
 }
 
+// taken from lecture
 char* concat(char* s1, char* s2) {
    char* new_ = malloc(strlen(s1) + strlen(s2) + 1);
    return strcat(strcpy(new_, s1), s2);

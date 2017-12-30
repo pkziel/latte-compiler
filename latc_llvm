@@ -4,11 +4,13 @@ fileName=$(basename $1)
 fileName=${fileName%.*}
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+IFS=
 result=$(./src/Compiler $1)
 
 if [[ $result != "" ]]
-then	
-	echo $reuslt > $pathToFile/$fileName.ll
+then
+	echo -e $result
+	echo -e $result > $pathToFile/$fileName.ll
 	llvm-as $pathToFile/$fileName.ll
-	llvm-link -o $pathToFile/$fileName.bc $pathToFile/$fileName.bc $script_dir/lib/runtime.bc
+	# llvm-link -o $pathToFile/$fileName.bc $pathToFile/$fileName.bc $script_dir/lib/runtime.bc
 fi

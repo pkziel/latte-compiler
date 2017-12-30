@@ -10,8 +10,7 @@ for i in $PWD/lattests/bad/*.lat; do
     echo
     fname="${filename%.*}"
     fname="$fname.ll"
-    line=$(head -n 1 lattests/bad/$fname 2>/dev/null)
-    if [ "$line" == "Ok" ];
+    if [! -f lattests/bad/$fname  ];
     then
     	counter=$((counter+1))
     fi
@@ -24,19 +23,19 @@ for i in $PWD/lattests/good/*.lat; do
     echo
     fname="${filename%.*}"
     fname="$fname.ll"
-    line=$(head -n 1 lattests/good/$fname 2>/dev/null)
-    if [ "$line" == "Ok" ];
+    if [ -f lattests/good/$fname ];
     then
     	counter1=$((counter1+1))
     fi
 done
 
 let "rr = 65 - $counter"
+
 echo
 echo Testy bad '-->' '('poprawne/wszystkie')' $rr / 65
 echo Testy good '-->' '('poprawne/wszystkie')' $counter1 / 22
 
-rm -f lattests/bad/*.ll
-rm -f lattests/bad/*.bc
-rm -f lattests/good/*.ll
-rm -f lattests/good/*.bc
+# rm -f lattests/bad/*.ll
+# rm -f lattests/bad/*.bc
+# rm -f lattests/good/*.ll
+# rm -f lattests/good/*.bc

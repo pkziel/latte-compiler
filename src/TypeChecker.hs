@@ -23,7 +23,7 @@ type Mem a b = ReaderT (FEnv b) (ErrorT String (StateT (VStore b) IO)) a
 
 typeCheck :: (Program Liner) -> IO()
 typeCheck (Program _ topDefs) = case getFunctionsDef topDefs of
-    Bad err -> putErrorInStderr err
+    Bad err -> throwMyError err
     Ok fenv -> runCheckFunction fenv topDefs
 
 -- firstly add functions to env
@@ -38,6 +38,7 @@ getFunctionsDef topDefs = do
 -- -- predifined functions added to env during init
 emptyFEnv :: (FEnv Liner)
 emptyFEnv = M.fromList [
+        (Ident "concat", ([Str Nothing, Str Nothing], Str Nothing)),
         (Ident "printInt", ([Int Nothing], Void Nothing)),
         (Ident "printString", ([Str Nothing], Void Nothing)),
         (Ident "error", ([], Void Nothing)),
@@ -61,11 +62,11 @@ checkNullArgs ((Arg _ b _) : t ) = case b of
 
 -- -- secondly we can check body of evsery single function
 runCheckFunction :: (FEnv Liner) -> [(TopDef Liner)] -> IO()
-runCheckFunction _ [] = throwMySuccess
+runCheckFunction _ [] = return ()
 runCheckFunction fenv (h:t) = do
     r <- evalStateT (runErrorT (runReaderT (checkFunction h) fenv)) []
     case r of
-        Left err -> putErrorInStderr err
+        Left err -> throwMyError err
         Right _ -> runCheckFunction fenv t
   
 checkFunction :: (TopDef Liner) -> Mem () Liner

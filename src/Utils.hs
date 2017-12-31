@@ -1,10 +1,17 @@
 module Utils (
-    throwMyError, throwMySuccess, isInt, isVoid, isBool, isStr, 
-    sameType, addLine, showMy, fromType, errNoMain, errBadSignature,
-    errFunctionExists, errFunctionShouldReturn, errArgsWithSameName,
-    errVarNotDecl, errAssType, errActionBadType, errExpectedReturnType,
-    errNonBoolIn, errVarAlreadyDecl, errDeclInitializer, errWrongParType,
-    errWrongNumberPar, errFunNotDecl
+    --grouped by theme
+    throwMyError, throwMySuccess,
+
+    isInt, isVoid, isBool, isStr, sameType, addLine, showMy, fromType, 
+
+    errNoMain, errBadSignature, errFunctionExists, errFunctionShouldReturn, 
+    errArgsWithSameName, errVarNotDecl, errAssType, errActionBadType, 
+    errExpectedReturnType, errNonBoolIn, errVarAlreadyDecl, errDeclInitializer, 
+    errWrongParType, errWrongNumberPar, errFunNotDecl,
+
+    initialFunDeclarations, printType, printArgsInFun,
+
+    Liner, VStore, FEnv, VEnv, Mem
 ) where
 
 import System.Exit
@@ -17,10 +24,10 @@ import qualified Data.Map as M
 
 import AbsLatte
 
-type Liner = Maybe (Int, Int)
-type VStore a = [(VEnv a)]
-type FEnv a = M.Map Ident ([(Type a)], (Type a))
-type VEnv a = M.Map Ident (Type a)
+type Liner = Maybe (Int, Int)                       -- place/line in code added to tree
+type VStore a = [VEnv a]                          -- context stack
+type FEnv a = M.Map Ident ([Type a], (Type a))    -- function type signature
+type VEnv a = M.Map Ident (Type a)                  -- variables with their types
 type Mem a b = ReaderT (FEnv b) (ErrorT String (StateT (VStore b) IO)) a
 
 -- error handling
@@ -33,7 +40,7 @@ addLine Nothing = ""
 
 throwMySuccess = hPutStrLn stderr ("OK") 
 
--- functions returning err messages
+-- functions returning err messages for typechecker
 errNoMain :: Err (FEnv Liner)
 errNoMain = fail "Function 'main' not found"
 
@@ -124,3 +131,25 @@ fromType (Int l) = l
 fromType (Str l) = l
 fromType (Void l) = l
 fromType (Bool l) = l
+
+-- functions than simply return String-llvm code / without much haskell logic
+-- word print can be a little misplaced
+initialFunDeclarations :: String
+initialFunDeclarations =
+    "declare void @printInt(i32)\n" ++ 
+    "declare void @printString(i8*)\n" ++ 
+    "declare void @error()\n" ++
+    "declare i32 @readInt()\n" ++ 
+    "declare i8* @readString()\n" ++ 
+    "declare i8* @concat(i8*, i8*)\n\n"
+
+printType :: (Type Liner) -> String
+printType (Void _) = "void"
+printType (Str _) = "i8*" 
+printType (Int _) = "i32"
+printType (Bool _) = "i1"
+
+printArgsInFun :: [Arg Liner] -> String
+printArgsInFun [] = ""
+printArgsInFun ((Arg _ t (Ident id)):[]) = printType t ++ " %" ++  id
+printArgsInFun ((Arg _ t (Ident id)):y) = printType t ++ " %" ++  id ++ ", "++ printArgsInFun y

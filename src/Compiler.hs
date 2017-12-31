@@ -4,12 +4,13 @@ module Main where
 
 import System.Environment
 import ErrM
+import Control.Monad
 
 import ParLatte
+import AbsLatte
 
 import LlvmGenerator
 import TypeChecker
-import AbsLatte
 import Utils
 
 main :: IO ()
@@ -24,10 +25,10 @@ compile :: String -> IO ()
 compile s = case pProgram (myLexer s) of
     Bad err -> throwMyError err
     Ok tree -> do
-        typeCheck tree
-        generateCode tree
+        fenv <- typeCheck tree
+        generatedCode <- generateCode fenv tree
+        putStr generatedCode
 
-generateCode :: (Program Liner) -> IO()
-generateCode (Program _ topDefs) = do 
-    putStr ("; Ok\n")
-    putStr $ foldl generateFunctions initialFunDeclarations topDefs
+generateCode :: (FEnv Liner) -> (Program Liner) -> IO(String)
+generateCode fenv (Program _ topDefs) =
+    foldM (generateFunctions fenv) initialFunDeclarations topDefs

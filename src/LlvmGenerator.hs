@@ -1,33 +1,50 @@
 module LlvmGenerator (
-    initialFunDeclarations, generateFunctions
+    generateFunctions
 ) where
 
+import qualified Data.Map as M
+import System.IO
+import Control.Monad.State
+import Control.Monad.Reader
+
 import AbsLatte
+import Utils
 
-type Liner = Maybe (Int, Int)
+type VarEnv a = M.Map Ident ((Type a), String)
+type VarStore a = [VarEnv a]
+type CounterState = (Int, Int) -- counter for registers, string constants
+type Code a b = ReaderT (FEnv b) (StateT (CounterState, (VarStore b)) IO) a
 
-initialFunDeclarations :: String
-initialFunDeclarations =
-    "declare void @printInt(i32)\n" ++ 
-    "declare void @printString(i8*)\n" ++ 
-    "declare void @error()\n" ++
-    "declare i32 @readInt()\n" ++ 
-    "declare i8* @readString()\n" ++ 
-    "declare i8* @concat(i8*, i8*)\n\n"
+generateFunctions :: (FEnv Liner) -> String ->  (TopDef Liner) -> IO(String) 
+generateFunctions fenv acc (FnDef _ t (Ident id) args block) = do
+    (consts, body) <- evalStateT (runReaderT (generateFun args block) fenv) initialStore
+    return $ consts ++ acc ++ "define " ++ (printType t) ++ " @" ++ id ++ "(" ++ 
+        (printArgsInFun args) ++ "){\n" ++ body ++ "}\n"
 
+initialStore = ((1,1), [M.empty])
 
-generateFunctions :: String -> (TopDef Liner) -> String
-generateFunctions acc (FnDef _ t (Ident id) args block) =
-    acc ++ "define " ++ (printType t) ++ " @" ++ id ++ "(" ++ (printArgsInFun args) ++ "){\n" ++ "}\n"
+generateFun :: [Arg Liner] -> (Block Liner) -> Code (String, String) Liner
+generateFun args block = do
+    s1 <- generateArgAlloca args ""
+    return ("", s1)
 
+generateArgAlloca :: [Arg Liner] -> String -> Code String Liner
+generateArgAlloca [] acc = return acc
+generateArgAlloca ((Arg _ t i@(Ident id)) : y) acc = do
+    reg1 <- takeNewRegister
+    insertNewVariable i t reg1
+    generateArgAlloca y (acc ++ "   %" ++ show reg1 ++ " = alloca " ++ (printType t)
+        ++ "\n   store " ++ (printType t) ++ " " ++ "%" ++ id ++ ", " ++ (printType t) 
+        ++ "*" ++ " %" ++ show reg1 ++ "\n")
 
-printType :: (Type Liner) -> String
-printType (Void _) = "void"
-printType (Str _) = "i8*" 
-printType (Int _) = "i32"
-printType (Bool _) = "i1"
+takeNewRegister :: Code Int Liner
+takeNewRegister = do
+    ((x,y), v) <- get
+    put (((x+1), y), v) 
+    return x
 
-printArgsInFun :: [(Arg Liner)] -> String
-printArgsInFun [] = ""
-printArgsInFun ((Arg _ t (Ident id)):[]) = printType t ++ " %" ++  id
-printArgsInFun ((Arg _ t (Ident id)):y) = printType t ++ " %" ++  id ++ ", "++ printArgsInFun y
+insertNewVariable :: Ident -> (Type Liner) -> Int ->  Code () Liner
+insertNewVariable id t nr= do
+    (p, s) <- get
+    put (p, (M.insert id (t, ("%" ++ show nr)) (head s):(tail s)))
+

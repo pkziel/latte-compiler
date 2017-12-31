@@ -1,7 +1,7 @@
 -- read top -> bottom
 
 module TypeChecker (
-    typeCheck, Liner
+    typeCheck, getFunctionsDef
 ) where
 
 import qualified Data.Map as M
@@ -15,19 +15,15 @@ import System.IO
 import AbsLatte
 import Utils
 
-type Liner = Maybe (Int, Int)                       -- place/line in code added to tree
-type VStore a = [(VEnv a)]                          -- context stack
-type FEnv a = M.Map Ident ([(Type a)], (Type a))    -- function type signature
-type VEnv a = M.Map Ident (Type a)                  -- variables with their types
-type Mem a b = ReaderT (FEnv b) (ErrorT String (StateT (VStore b) IO)) a
-
-typeCheck :: (Program Liner) -> IO()
+typeCheck :: (Program Liner) -> IO(FEnv Liner)
 typeCheck (Program _ topDefs) = case getFunctionsDef topDefs of
     Bad err -> throwMyError err
-    Ok fenv -> runCheckFunction fenv topDefs
+    Ok fenv -> do
+        runCheckFunction fenv topDefs
+        return fenv
 
 -- firstly add functions to env
-getFunctionsDef :: [(TopDef Liner)] -> Err (FEnv Liner)
+getFunctionsDef :: [TopDef Liner] -> Err (FEnv Liner)
 getFunctionsDef topDefs = do
     fenv <- foldM (updateFun) emptyFEnv topDefs
     case M.lookup (Ident "main") fenv of
@@ -49,12 +45,13 @@ updateFun :: (FEnv Liner) -> (TopDef Liner) -> Err (FEnv Liner)
 updateFun fenv (FnDef line t id@(Ident s) args _) = case M.lookup id fenv of
     Just _ -> errFunctionExists s line
     Nothing -> case checkNullArgs args of 
-        True -> fail $ "Function can't take void parameters" ++ (addLine line)
+        True -> fail $ "Function '" ++ s ++ "' can't take void parameters" ++ 
+            (addLine line)
         False -> return $ (M.insert id ( types args, t) fenv)
     where
         types _args = map (\(Arg _ t _) -> t) _args
 
-checkNullArgs :: [(Arg Liner)] -> Bool
+checkNullArgs :: [Arg Liner] -> Bool
 checkNullArgs [] = False
 checkNullArgs ((Arg _ b _) : t ) = case b of
     (Void _) -> True
@@ -284,7 +281,7 @@ infer (ERel line e1 _ e2) = do
         False -> fail $ "Both left and right expression has to be int <,<=,>,=> exps" 
             ++ (addLine line)
 
-checkFunctionArgs:: [(Type Liner)] -> [(Expr Liner)] -> String -> Liner -> Mem () Liner
+checkFunctionArgs:: [Type Liner] -> [Expr Liner] -> String -> Liner -> Mem () Liner
 checkFunctionArgs [] [] _ _ = return ()
 checkFunctionArgs (h:t) (x:s) str line = do
     app_type <- infer x

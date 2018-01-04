@@ -9,7 +9,7 @@ module Utils (
     errExpectedReturnType, errNonBoolIn, errVarAlreadyDecl, errDeclInitializer, 
     errWrongParType, errWrongNumberPar, errFunNotDecl,
 
-    initialFunDeclarations, printType, printArgsInFun,
+    initialFunDeclarations, printType, printArgsInFun, printAlloca, printStore,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -24,10 +24,10 @@ import qualified Data.Map as M
 
 import AbsLatte
 
-type Liner = Maybe (Int, Int)                       -- place/line in code added to tree
+type Liner = Maybe (Int, Int)                     -- place/line in code added to tree
 type VStore a = [VEnv a]                          -- context stack
 type FEnv a = M.Map Ident ([Type a], (Type a))    -- function type signature
-type VEnv a = M.Map Ident (Type a)                  -- variables with their types
+type VEnv a = M.Map Ident (Type a)                -- variables with their types
 type Mem a b = ReaderT (FEnv b) (ErrorT String (StateT (VStore b) IO)) a
 
 -- error handling
@@ -153,3 +153,10 @@ printArgsInFun :: [Arg Liner] -> String
 printArgsInFun [] = ""
 printArgsInFun ((Arg _ t (Ident id)):[]) = printType t ++ " %" ++  id
 printArgsInFun ((Arg _ t (Ident id)):y) = printType t ++ " %" ++  id ++ ", "++ printArgsInFun y
+
+printAlloca :: Int -> (Type Liner) -> String
+printAlloca i t = "   %" ++ show i ++ " = alloca " ++ (printType t) ++ "\n"
+
+printStore :: (Type Liner) -> String -> Int -> String
+printStore t id reg1 = "   store " ++ (printType t) ++ " " ++ "%" ++ id ++ ", " ++ 
+    (printType t) ++ "*" ++ " %" ++ show reg1 ++ "\n"

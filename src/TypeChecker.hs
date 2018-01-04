@@ -165,7 +165,6 @@ checkStmt _ b (SExp _ exp) = do
     return b
 
 
-
 checkItem :: (Type Liner) -> (Item Liner) -> Mem () Liner
 checkItem t item@(NoInit line ident@(Ident id)) = do
     s <- get

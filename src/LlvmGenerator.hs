@@ -41,6 +41,12 @@ takeNewRegister = do
     put (((x+1), y), v) 
     return x
 
+addNewString :: Code String Liner
+addNewString = do
+    ((x,y), v) <- get
+    put ((x, (y+1)), v) 
+    return $ "@.str" ++ show y 
+
 insertNewVariable :: Ident -> (Type Liner) -> Int ->  Code () Liner
 insertNewVariable id t nr = do
     (p, s) <- get
@@ -71,12 +77,16 @@ generateStmt (Decr _ i@(Ident id)) = do
     (type_, register) <- findVar i
     newRegister <- takeNewRegister 
     return ("", printLoad newRegister type_ register)
-generateStmt (Ret _ exp) = return ("", "   ret void\n")    
-generateStmt (VRet _) = return ("", "   ret void\n")
+generateStmt (Ret _ exp) = do
+    ((consts, code), type_, val) <- generateExpr exp "" ""
+    return (consts, code ++ "\tret " ++ printType type_ ++ " " ++ val ++ "\n")    
+generateStmt (VRet _) = return ("", "\tret void\n")
 generateStmt (Cond _ exp stmt) = return ("", "")
 generateStmt (CondElse _ exp1 stmt1 stmt2) = return ("", "")
 generateStmt (While _ exp stmt) = return ("", "")
-generateStmt (SExp _ exp) = return ("", "")
+generateStmt (SExp _ exp) = do
+    ((consts, code), type_, val) <- generateExpr exp "" ""
+    return (consts, code)
 
 generateDeclVar :: (Type Liner) -> (String, String) -> (Item Liner) -> Code (String, String) Liner
 generateDeclVar t (l,r) (NoInit _ i@(Ident id)) = do
@@ -116,6 +126,9 @@ generateExpr (EApp _ ident@(Ident i) exprs) _ _ = do
             newRegister <- takeNewRegister
             return ((consts, preCode ++ printCall ret_typ newRegister i inCode), 
                 ret_typ, "%" ++ show newRegister)
+generateExpr (EString _ str) _ _ = do
+    newRegStr <- addNewString
+    return ((printStringConst newRegStr str, ""), (Str Nothing), newRegStr)
 
 generateCallArgs :: (String, String, [((Type Liner), String)]) -> (Expr Liner) -> 
     Code (String, String, [((Type Liner), String)]) Liner

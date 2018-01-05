@@ -10,6 +10,7 @@ module Utils (
     errWrongParType, errWrongNumberPar, errFunNotDecl,
 
     initialFunDeclarations, printType, printArgsInFun, printAlloca, printStore,
+    giveInitialValue, printLoad, printCall,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -136,6 +137,7 @@ fromType (Bool l) = l
 -- word print can be a little misplaced
 initialFunDeclarations :: String
 initialFunDeclarations =
+    "@.str0 = private constant [0 x i8] c\"Hello,\00\" \n\n" ++
     "declare void @printInt(i32)\n" ++ 
     "declare void @printString(i8*)\n" ++ 
     "declare void @error()\n" ++
@@ -158,5 +160,23 @@ printAlloca :: Int -> (Type Liner) -> String
 printAlloca i t = "   %" ++ show i ++ " = alloca " ++ (printType t) ++ "\n"
 
 printStore :: (Type Liner) -> String -> Int -> String
-printStore t id reg1 = "   store " ++ (printType t) ++ " " ++ "%" ++ id ++ ", " ++ 
+printStore t val reg1 = "   store " ++ (printType t) ++ " " ++ val ++ ", " ++ 
     (printType t) ++ "*" ++ " %" ++ show reg1 ++ "\n"
+
+giveInitialValue :: (Type Liner) -> String
+giveInitialValue (Str _) = "@.str0" 
+giveInitialValue (Int _) = "0"
+giveInitialValue (Bool _) = "false"
+
+printLoad :: Int -> (Type Liner) -> String -> String
+printLoad newRegister type_ locReg = "   %" ++ show newRegister ++ " = load " ++ 
+    printType type_ ++ ", " ++ (printType type_) ++ "* " ++ locReg ++ "\n"
+
+printCall :: (Type Liner) -> Int -> String -> [((Type Liner), String)] -> String
+printCall type_ reg id arr = "    %" ++ show reg ++ " = call " ++ printType type_ ++
+    " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
+
+printCallArgs :: [((Type Liner), String)] -> String
+printCallArgs [] = ""
+printCallArgs ((t, s):[]) = printType t ++ " " ++ s
+printCallArgs ((t, s):y) = printType t ++ " " ++  s ++ ", "++ printCallArgs y

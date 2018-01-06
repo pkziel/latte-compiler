@@ -9,8 +9,10 @@ module Utils (
     errExpectedReturnType, errNonBoolIn, errVarAlreadyDecl, errDeclInitializer, 
     errWrongParType, errWrongNumberPar, errFunNotDecl,
 
-    initialFunDeclarations, printType, printArgsInFun, printAlloca, printStore,
-    giveInitialValue, printLoad, printCall, printStringConst,
+    initialFunDeclarations, giveInitialValue,
+
+    printType, printArgsInFun, printAlloca, printStore, printLoad, printCall, 
+    printStringConst, printIf, printIfElse, printWhile,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -155,25 +157,26 @@ printArgsInFun [] = ""
 printArgsInFun ((Arg _ t (Ident id)):[]) = printType t ++ " %" ++  id
 printArgsInFun ((Arg _ t (Ident id)):y) = printType t ++ " %" ++  id ++ ", "++ printArgsInFun y
 
-printAlloca :: Int -> (Type Liner) -> String
-printAlloca i t = "\t%" ++ show i ++ " = alloca " ++ (printType t) ++ "\n"
+printAlloca :: String -> (Type Liner) -> String
+printAlloca i t = "\t" ++ i ++ " = alloca " ++ (printType t) ++ "\n"
 
-printStore :: (Type Liner) -> String -> Int -> String
+printStore :: (Type Liner) -> String -> String -> String
 printStore t val reg1 = "\tstore " ++ (printType t) ++ " " ++ val ++ ", " ++ 
-    (printType t) ++ "*" ++ " %" ++ show reg1 ++ "\n"
+    (printType t) ++ "*" ++ " " ++ reg1 ++ "\n"
 
 giveInitialValue :: (Type Liner) -> String
-giveInitialValue (Str _) = "@.str0" 
 giveInitialValue (Int _) = "0"
 giveInitialValue (Bool _) = "false"
 
-printLoad :: Int -> (Type Liner) -> String -> String
-printLoad newRegister type_ locReg = "\t%" ++ show newRegister ++ " = load " ++ 
+printLoad :: String -> (Type Liner) -> String -> String
+printLoad newRegister type_ locReg = "\t" ++ newRegister ++ " = load " ++ 
     printType type_ ++ ", " ++ (printType type_) ++ "* " ++ locReg ++ "\n"
 
 printCall :: (Type Liner) -> Int -> String -> [((Type Liner), String)] -> String
-printCall type_ reg id arr = "\t%" ++ show reg ++ " = call " ++ printType type_ ++
-    " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
+printCall type_ reg id arr = case type_ of
+    Void _ -> "\tcall " ++ printType type_ ++ " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
+    _ -> "\t%" ++ show reg ++ " = call " ++ printType type_ ++
+        " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
 
 printCallArgs :: [((Type Liner), String)] -> String
 printCallArgs [] = ""
@@ -183,3 +186,44 @@ printCallArgs ((t, s):y) = printType t ++ " " ++  s ++ ", "++ printCallArgs y
 printStringConst :: String -> String -> String
 printStringConst reg str = reg ++ " = private constant [" ++ show (length str + 1) 
     ++ " x i8] c" ++ id str ++ "\n"-- ++ "\\00\n"
+
+printLabel :: String -> String
+printLabel label = label ++ ":\n"
+
+printGoto :: String -> String
+printGoto label = "\tbr label %" ++ label ++ "\n" 
+
+printBr :: String -> String -> String -> String -> String
+printBr brReg val ifLabel afterIfLabel = 
+    "\t" ++ brReg ++ " = icmp eq i1 " ++ val ++ ", true\n" ++
+    "\tbr i1 " ++ brReg ++ ", label %" ++ ifLabel ++ ", label %" ++ afterIfLabel ++ "\n"
+
+printIf :: String -> String -> String -> String -> String -> String
+printIf ifLabel afterIfLabel brReg val inIf =
+    printBr brReg val ifLabel afterIfLabel ++ 
+    printLabel ifLabel ++ 
+    inIf ++ 
+    printGoto afterIfLabel ++
+    printLabel afterIfLabel
+
+printIfElse :: String -> String -> String -> String -> String -> String -> String -> String
+printIfElse ifLabel elseLabel afterLabel brReg val inIf inElse =
+    printBr brReg val ifLabel elseLabel ++
+    printLabel ifLabel ++
+    inIf ++
+    printGoto afterLabel ++
+    printLabel elseLabel ++
+    inElse ++ 
+    printGoto afterLabel ++
+    printLabel afterLabel
+
+printWhile :: String -> String -> String -> String -> String -> String -> String -> String
+printWhile expCode conditionLabel whileLabel afterLabel brReg val inWhile =
+    printGoto conditionLabel ++
+    printLabel conditionLabel ++
+    expCode ++
+    printBr brReg val whileLabel afterLabel ++
+    printLabel whileLabel ++
+    inWhile ++
+    printGoto conditionLabel ++
+    printLabel afterLabel

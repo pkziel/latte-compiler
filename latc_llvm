@@ -11,6 +11,6 @@ if [[ $result != "" ]]
 then
 	echo -e $result
 	echo $result > $pathToFile/$fileName.ll
-	# llvm-as $pathToFile/$fileName.ll
-	# llvm-link -o $pathToFile/$fileName.bc $pathToFile/$fileName.bc $script_dir/lib/runtime.bc
+	llvm-as $pathToFile/$fileName.ll
+	llvm-link -o $pathToFile/$fileName.bc $pathToFile/$fileName.bc $script_dir/lib/runtime.bc
 fi

@@ -10,97 +10,138 @@ import Control.Monad.Reader
 import AbsLatte
 import Utils
 
+-- type ConstMap = M.Map String String
 type VarEnv a = M.Map Ident ((Type a), String)
 type VarStore a = [VarEnv a]
-type CounterState = (Int, Int) -- counter for registers, string constants
-type Code a b = ReaderT (FEnv b) (StateT (CounterState, (VarStore b)) IO) a
+type StringStore = M.Map String String
+-- in state we store counter for registers, variable stack, string store
+type Code a b = ReaderT (FEnv b) (StateT (Int, (VarStore b), StringStore) IO) a
 
-generateFunctions :: (FEnv Liner) -> String ->  (TopDef Liner) -> IO(String) 
+generateFunctions :: (FEnv Liner) -> String -> (TopDef Liner) -> IO(String) 
 generateFunctions fenv acc (FnDef _ t (Ident id) args block) = do
-    (consts, body) <- evalStateT (runReaderT (generateFun args block) fenv) initialStore
-    return $ consts ++ acc ++ "define " ++ (printType t) ++ " @" ++ id ++ "(" ++ 
-        (printArgsInFun args) ++ "){\n" ++ body ++ "}\n"
+    (body, _) <- runStateT (runReaderT (generateFun args block) fenv) initialStore
+    return $ acc ++ "define " ++ (printType t) ++ " @" ++ id ++ "(" ++ 
+        (printArgsInFun args) ++ "){\n" ++ body ++ (maybeRet t) ++ "}\n\n"
+maybeRet t = case t of
+    Void _ -> "\tret void\n"
+    -- this is in case of empty label on the end (llvm doesn't accept it)
+    -- typechecker should provide that this will not be used
+    _ -> "\tret "++ printType t ++ " undef\n" 
+initialStore = (1, [M.empty], M.empty)
 
-initialStore = ((1,1), [M.empty])
-
-generateFun :: [Arg Liner] -> (Block Liner) -> Code (String, String) Liner
+generateFun :: [Arg Liner] -> (Block Liner) -> Code String Liner
 generateFun args (Block _ stmts) = do
     s1 <- foldM generateArgAlloca "" args
-    (consts, s2) <- foldM generateStmts ("","") stmts
-    return (consts, s1 ++ s2)
+    s2 <- foldM generateStmts "" stmts
+    return $ s1 ++ s2
 
 generateArgAlloca :: String -> (Arg Liner) -> Code String Liner
 generateArgAlloca acc (Arg _ t i@(Ident id)) = do
-    reg1 <- takeNewRegister
+    reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
     return $ acc ++ printAlloca reg1 t ++ printStore t ("%" ++ id) reg1
 
 takeNewRegister :: Code Int Liner
 takeNewRegister = do
-    ((x,y), v) <- get
-    put (((x+1), y), v) 
+    (x, v, z) <- get
+    put (x+1, v, z) 
     return x
 
-addNewString :: Code String Liner
-addNewString = do
-    ((x,y), v) <- get
-    put ((x, (y+1)), v) 
-    return $ "@.str" ++ show y 
+giveNewVarRegister :: Code String Liner
+giveNewVarRegister = do
+    reg <- takeNewRegister
+    return $ "%reg_" ++ show reg
 
-insertNewVariable :: Ident -> (Type Liner) -> Int ->  Code () Liner
-insertNewVariable id t nr = do
-    (p, s) <- get
-    put (p, (M.insert id (t, ("%" ++ show nr)) (head s):(tail s)))
+giveNewLabel :: Code String Liner
+giveNewLabel = do
+    reg <- takeNewRegister
+    return $ "label" ++ show reg
 
-generateStmts :: (String, String) -> (Stmt Liner)-> Code (String, String) Liner
-generateStmts (c1, s1) x = do
-    (c2, s2) <- generateStmt x
-    return (c1++c2, s1++s2)
+addNewStringConstant :: String -> Code String Liner
+addNewStringConstant s = return ""
 
-generateStmt :: (Stmt Liner) -> Code (String, String) Liner
-generateStmt (Empty _) = return ("","")
+insertNewVariable :: Ident -> (Type Liner) -> String ->  Code () Liner
+insertNewVariable id t reg = do
+    (p, s, v) <- get
+    put (p, (M.insert id (t, reg) (head s):(tail s)), v)
+
+generateStmts :: String -> (Stmt Liner)-> Code String Liner
+generateStmts s1 x = do
+    s2 <- generateStmt x
+    return $ s1 ++ s2 
+
+generateStmt :: (Stmt Liner) -> Code String Liner
+generateStmt (Empty _) = return ""
 generateStmt (BStmt _ (Block _ stmts)) = do
-    (p, s) <- get
-    put (p, M.empty:s)
-    res <- foldM generateStmts ("","") stmts
-    modify (\(shouldStay, _) -> (shouldStay, s))
+    (p, s, v) <- get
+    put (p, M.empty:s, v)
+    res <- foldM generateStmts "" stmts
+    modify (\(shouldStay, _, shouldStay2) -> (shouldStay, s, shouldStay2))
     return res
-generateStmt (Decl _ t items) = foldM (generateDeclVar t) ("","") items
+generateStmt (Decl _ t items) = foldM (generateDeclVar t) "" items
 generateStmt (Ass _ i@(Ident id) exp) = do
     (type_, register) <- findVar i
-    return ("", "")
-generateStmt (Incr _ i@(Ident id)) = do
-    (type_, register) <- findVar i
-    newRegister <- takeNewRegister 
-    return ("", printLoad newRegister type_ register)
-generateStmt (Decr _ i@(Ident id)) = do
-    (type_, register) <- findVar i
-    newRegister <- takeNewRegister 
-    return ("", printLoad newRegister type_ register)
+    (code, _, res) <- generateExpr exp
+    return $ printStore type_ res register
+-- generateStmt (Incr _ i@(Ident id)) = do
+--     (type_, register) <- findVar i
+--     newRegister <- takeNewRegister 
+--     return $ printLoad newRegister type_ register
+-- generateStmt (Decr _ i@(Ident id)) = do
+--     (type_, register) <- findVar i
+--     newRegister <- takeNewRegister
+--     return $ printLoad newRegister type_ register
 generateStmt (Ret _ exp) = do
-    ((consts, code), type_, val) <- generateExpr exp "" ""
-    return (consts, code ++ "\tret " ++ printType type_ ++ " " ++ val ++ "\n")    
-generateStmt (VRet _) = return ("", "\tret void\n")
-generateStmt (Cond _ exp stmt) = return ("", "")
-generateStmt (CondElse _ exp1 stmt1 stmt2) = return ("", "")
-generateStmt (While _ exp stmt) = return ("", "")
+    (code, type_, val) <- generateExpr exp
+    return $ code ++ "\tret " ++ printType type_ ++ " " ++ val ++ "\n"    
+generateStmt (VRet _) = return "\tret void\n"
+generateStmt (Cond _ exp stmt) = do
+    (code, type_, val) <- generateExpr exp
+    ifLabel <- giveNewLabel
+    afterIfLabel <- giveNewLabel
+    brReg <- giveNewVarRegister
+    inIf <- generateStmt stmt
+    return $ code ++ printIf ifLabel afterIfLabel brReg val inIf
+generateStmt (CondElse _ exp stmt1 stmt2) = do
+    (code, type_, val) <- generateExpr exp
+    ifLabel <- giveNewLabel
+    elseLabel <- giveNewLabel
+    afterLabel <- giveNewLabel
+    brReg <- giveNewVarRegister
+    inIf <- generateStmt stmt1
+    inElse <- generateStmt stmt1
+    return $ code ++ printIfElse ifLabel elseLabel afterLabel brReg val inIf inElse
+generateStmt (While _ exp stmt) = do
+    (code, type_, val) <- generateExpr exp
+    conditionLabel <- giveNewLabel
+    whileLabel <- giveNewLabel
+    afterLabel <- giveNewLabel
+    brReg <- giveNewVarRegister
+    inWhile <- generateStmt stmt
+    return $ printWhile code conditionLabel whileLabel afterLabel brReg val inWhile
 generateStmt (SExp _ exp) = do
-    ((consts, code), type_, val) <- generateExpr exp "" ""
-    return (consts, code)
+    (code, type_, val) <- generateExpr exp
+    return code
 
-generateDeclVar :: (Type Liner) -> (String, String) -> (Item Liner) -> Code (String, String) Liner
-generateDeclVar t (l,r) (NoInit _ i@(Ident id)) = do
-    reg1 <- takeNewRegister
+generateDeclVar :: (Type Liner) -> String -> (Item Liner) -> Code String Liner
+-- for string we have to add empty string
+generateDeclVar t@(Str _) v (NoInit _ i@(Ident id)) = do
+    reg1 <- giveNewVarRegister
+    regWithString <- addNewStringConstant ""
+    return $ v ++ printAlloca reg1 t ++ printStore t regWithString reg1
+generateDeclVar t v (NoInit _ i@(Ident id)) = do
+    reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
-    return (l,r ++ printAlloca reg1 t ++ printStore t (giveInitialValue t) reg1)
-generateDeclVar t (l,r) (Init _ i@(Ident id) exp) = do
-    reg1 <- takeNewRegister
+    return $ v ++ printAlloca reg1 t ++ printStore t (giveInitialValue t) reg1
+generateDeclVar t v (Init _ i@(Ident id) exp) = do
+    (code, _, res) <- generateExpr exp
+    reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
-    return (l,r ++ printAlloca reg1 t ++ printStore t (giveInitialValue t) reg1)
+    return $ code ++ v ++ printAlloca reg1 t ++ printStore t res reg1
 
 findVar :: Ident -> Code ((Type Liner), String) Liner
 findVar i = do
-    (p, s) <- get
+    (p, s, v) <- get
     findRegInStack i s
 
 findRegInStack :: Ident -> (VarStore Liner) -> Code ((Type Liner), String) Liner
@@ -110,28 +151,30 @@ findRegInStack id (h:t) = case M.lookup id h of
 
 -- we take expr, label true, label left
 -- we return code generated by expr, type of result and register/value
-generateExpr :: (Expr Liner) -> String -> String -> 
-    Code ((String, String), (Type Liner), String) Liner
-generateExpr (EVar _ id) _ _  = do
+generateExpr :: (Expr Liner) -> Code (String, (Type Liner), String) Liner
+generateExpr (EVar _ id) = do
     (type_, register) <- findVar id
-    return (("",""), type_, register)
-generateExpr (ELitInt _ num) _ _  = return (("",""), (Int Nothing), show num)
-generateExpr (ELitTrue _) _ _  = return (("",""), (Bool Nothing), "true")
-generateExpr (ELitFalse _) _ _  = return (("",""), (Bool Nothing), "false")
-generateExpr (EApp _ ident@(Ident i) exprs) _ _ = do
+    newReg <- giveNewVarRegister
+    return (printLoad newReg type_ register , type_, newReg)
+generateExpr (ELitInt _ num) = return ("", (Int Nothing), show num)
+generateExpr (ELitTrue _) = return ("", (Bool Nothing), "true")
+generateExpr (ELitFalse _) = return ("", (Bool Nothing), "false")
+generateExpr (EApp _ ident@(Ident i) exprs) = do
     (res) <- asks (M.lookup ident)
     case res of 
         Just (types, ret_typ) -> do
-            (consts, preCode, inCode) <- foldM generateCallArgs ("","", []) exprs
+            (preCode, inCode) <- foldM generateCallArgs ("", []) exprs
             newRegister <- takeNewRegister
-            return ((consts, preCode ++ printCall ret_typ newRegister i inCode), 
-                ret_typ, "%" ++ show newRegister)
-generateExpr (EString _ str) _ _ = do
-    newRegStr <- addNewString
-    return ((printStringConst newRegStr str, ""), (Str Nothing), newRegStr)
+            return (preCode ++ printCall ret_typ newRegister i inCode, ret_typ, 
+                "%" ++ show newRegister)
+generateExpr (EString _ str) = do
+    -- newRegStr <- addNewString
+    return ("", (Str Nothing), "newRegStr")
+-- generateExpr (EAnd _ exp1 exp2) = do
+--     newRegister <- takeNewRegister
 
-generateCallArgs :: (String, String, [((Type Liner), String)]) -> (Expr Liner) -> 
-    Code (String, String, [((Type Liner), String)]) Liner
-generateCallArgs (acc1, acc2, acc3) exp = do
-    ((consts, code), type_, res) <- generateExpr exp "" ""
-    return (acc1 ++ consts, acc2 ++ code, acc3 ++ [(type_, res)] )
+generateCallArgs :: (String, [((Type Liner), String)]) -> (Expr Liner) -> 
+    Code (String, [((Type Liner), String)]) Liner
+generateCallArgs (acc1, acc2) exp = do
+    (code, type_, res) <- generateExpr exp
+    return (acc1 ++ code, acc2 ++ [(type_, res)] )

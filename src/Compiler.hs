@@ -5,6 +5,7 @@ module Main where
 import System.Environment
 import ErrM
 import Control.Monad
+import qualified Data.Map as M
 
 import ParLatte
 import AbsLatte
@@ -12,6 +13,8 @@ import AbsLatte
 import LlvmGenerator
 import TypeChecker
 import Utils
+
+type StringStore = M.Map String String
 
 main :: IO ()
 main = do
@@ -26,9 +29,9 @@ compile s = case pProgram (myLexer s) of
     Bad err -> throwMyError err
     Ok tree -> do
         fenv <- typeCheck tree
-        generatedCode <- generateCode fenv tree
-        putStr generatedCode
+        (consts, _, generatedCode) <- generateCode fenv tree
+        putStr $ (printConsts consts) ++ "\n" ++ generatedCode
 
-generateCode :: (FEnv Liner) -> (Program Liner) -> IO(String)
-generateCode fenv (Program _ topDefs) =
-    foldM (generateFunctions fenv) initialFunDeclarations topDefs
+generateCode :: (FEnv Liner) -> (Program Liner) -> IO(StringStore, Int, String)
+generateCode fenv (Program _ topDefs) = do
+    foldM (generateFunctions fenv) (M.empty, 1, initialFunDeclarations) topDefs

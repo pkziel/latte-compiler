@@ -12,7 +12,7 @@ module Utils (
     initialFunDeclarations, giveInitialValue,
 
     printType, printArgsInFun, printAlloca, printStore, printLoad, printCall, 
-    printStringConst, printIf, printIfElse, printWhile,
+    printIf, printIfElse, printWhile, printBitcast, printConsts, printXor,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -164,6 +164,10 @@ printStore :: (Type Liner) -> String -> String -> String
 printStore t val reg1 = "\tstore " ++ (printType t) ++ " " ++ val ++ ", " ++ 
     (printType t) ++ "*" ++ " " ++ reg1 ++ "\n"
 
+printBitcast :: String -> String -> String -> String
+printBitcast reg lenofstrq val = "\t" ++ reg ++ " = bitcast[" ++ 
+    show (length (stringWithoutQ lenofstrq) + 1) ++ " x i8]* " ++ val ++ " to i8*\n"
+
 giveInitialValue :: (Type Liner) -> String
 giveInitialValue (Int _) = "0"
 giveInitialValue (Bool _) = "false"
@@ -182,10 +186,6 @@ printCallArgs :: [((Type Liner), String)] -> String
 printCallArgs [] = ""
 printCallArgs ((t, s):[]) = printType t ++ " " ++ s
 printCallArgs ((t, s):y) = printType t ++ " " ++  s ++ ", "++ printCallArgs y
-
-printStringConst :: String -> String -> String
-printStringConst reg str = reg ++ " = private constant [" ++ show (length str + 1) 
-    ++ " x i8] c" ++ id str ++ "\n"-- ++ "\\00\n"
 
 printLabel :: String -> String
 printLabel label = label ++ ":\n"
@@ -227,3 +227,16 @@ printWhile expCode conditionLabel whileLabel afterLabel brReg val inWhile =
     inWhile ++
     printGoto conditionLabel ++
     printLabel afterLabel
+
+printConsts :: M.Map String String -> String
+printConsts map_ = M.foldlWithKey addNewConst "" map_
+
+addNewConst :: String -> String -> String -> String
+addNewConst acc value key = acc ++ "@" ++ key ++ " = private constant [" ++ 
+    show (length (stringWithoutQ value) + 1) ++ " x i8] c\"" ++ stringWithoutQ value 
+    ++ "\\00\"" ++ "\n"
+
+stringWithoutQ str = reverse $ tail $ reverse $ tail str
+
+printXor :: String -> String -> String
+printXor res reg1 = "\t" ++ res ++ " = xor i1 true, " ++ reg1 ++ "\n"

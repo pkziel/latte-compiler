@@ -17,17 +17,18 @@ type StringStore = M.Map String String
 -- in state we store counter for registers, variable stack, string store
 type Code a b = ReaderT (FEnv b) (StateT (Int, (VarStore b), StringStore) IO) a
 
-generateFunctions :: (FEnv Liner) -> String -> (TopDef Liner) -> IO(String) 
-generateFunctions fenv acc (FnDef _ t (Ident id) args block) = do
-    (body, _) <- runStateT (runReaderT (generateFun args block) fenv) initialStore
-    return $ acc ++ "define " ++ (printType t) ++ " @" ++ id ++ "(" ++ 
-        (printArgsInFun args) ++ "){\n" ++ body ++ (maybeRet t) ++ "}\n\n"
+generateFunctions :: (FEnv Liner) -> (StringStore, Int, String) -> (TopDef Liner) -> IO(StringStore, Int, String)
+generateFunctions fenv (accM, accC, acc) (FnDef _ t (Ident id) args block) = do
+    (body, (count ,_, consts)) <- runStateT (runReaderT (generateFun args block) fenv) 
+        (initialStore accC accM)
+    return (consts, count, acc ++ "define " ++ (printType t) ++ " @" ++ 
+        id ++ "(" ++ (printArgsInFun args) ++ "){\n" ++ body ++ (maybeRet t) ++ "}\n\n")
 maybeRet t = case t of
     Void _ -> "\tret void\n"
-    -- this is in case of empty label on the end (llvm doesn't accept it)
+    -- this is in case of empty label at the end (llvm doesn't accept it)
     -- typechecker should provide that this will not be used
     _ -> "\tret "++ printType t ++ " undef\n" 
-initialStore = (1, [M.empty], M.empty)
+initialStore counter map_ = (counter, [M.empty], map_)
 
 generateFun :: [Arg Liner] -> (Block Liner) -> Code String Liner
 generateFun args (Block _ stmts) = do
@@ -58,7 +59,14 @@ giveNewLabel = do
     return $ "label" ++ show reg
 
 addNewStringConstant :: String -> Code String Liner
-addNewStringConstant s = return ""
+addNewStringConstant s = do
+    (x, v, m) <- get
+    case M.lookup s m of
+        Nothing -> do
+            newRegNr <- takeNewRegister
+            put (x, v, M.insert s (".str" ++ show newRegNr) m)
+            return (".str" ++ show newRegNr)
+        Just reg -> return reg
 
 insertNewVariable :: Ident -> (Type Liner) -> String ->  Code () Liner
 insertNewVariable id t reg = do
@@ -82,15 +90,11 @@ generateStmt (Decl _ t items) = foldM (generateDeclVar t) "" items
 generateStmt (Ass _ i@(Ident id) exp) = do
     (type_, register) <- findVar i
     (code, _, res) <- generateExpr exp
-    return $ printStore type_ res register
--- generateStmt (Incr _ i@(Ident id)) = do
---     (type_, register) <- findVar i
---     newRegister <- takeNewRegister 
---     return $ printLoad newRegister type_ register
--- generateStmt (Decr _ i@(Ident id)) = do
---     (type_, register) <- findVar i
---     newRegister <- takeNewRegister
---     return $ printLoad newRegister type_ register
+    return $ printStore type_ res register    
+generateStmt (Incr _ i) = generateStmt (Ass Nothing i (EAdd Nothing 
+    (EVar Nothing i) (Plus Nothing) (ELitInt Nothing 1)))
+generateStmt (Decr _ i) = generateStmt (Ass Nothing i (EAdd Nothing 
+    (EVar Nothing i) (Minus Nothing) (ELitInt Nothing 1)))
 generateStmt (Ret _ exp) = do
     (code, type_, val) <- generateExpr exp
     return $ code ++ "\tret " ++ printType type_ ++ " " ++ val ++ "\n"    
@@ -124,11 +128,10 @@ generateStmt (SExp _ exp) = do
     return code
 
 generateDeclVar :: (Type Liner) -> String -> (Item Liner) -> Code String Liner
--- for string we have to add empty string
 generateDeclVar t@(Str _) v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     regWithString <- addNewStringConstant ""
-    return $ v ++ printAlloca reg1 t ++ printStore t regWithString reg1
+    return $ v ++ printAlloca reg1 t ++ printBitcast reg1 "xx" regWithString
 generateDeclVar t v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
@@ -166,15 +169,20 @@ generateExpr (EApp _ ident@(Ident i) exprs) = do
             (preCode, inCode) <- foldM generateCallArgs ("", []) exprs
             newRegister <- takeNewRegister
             return (preCode ++ printCall ret_typ newRegister i inCode, ret_typ, 
-                "%" ++ show newRegister)
+                "%" ++ show newRegister)            
 generateExpr (EString _ str) = do
-    -- newRegStr <- addNewString
-    return ("", (Str Nothing), "newRegStr")
--- generateExpr (EAnd _ exp1 exp2) = do
---     newRegister <- takeNewRegister
+    reg1 <- giveNewVarRegister
+    regWithString <- addNewStringConstant str
+    return (printBitcast reg1 str ("@" ++ regWithString), (Str Nothing), reg1)
+generateExpr (Neg _ expr) = generateExpr (EMul Nothing (ELitInt Nothing (-1)) (Times Nothing) expr)
+generateExpr (Not _ expr) = do
+    (code , _, reg2) <- generateExpr expr
+    reg1 <- giveNewVarRegister
+    return (code ++ printXor reg1 reg2 , (Bool Nothing), reg1)
 
 generateCallArgs :: (String, [((Type Liner), String)]) -> (Expr Liner) -> 
     Code (String, [((Type Liner), String)]) Liner
 generateCallArgs (acc1, acc2) exp = do
     (code, type_, res) <- generateExpr exp
-    return (acc1 ++ code, acc2 ++ [(type_, res)] )
+    return (acc1 ++ code, acc2 ++ [(type_, res)])
+

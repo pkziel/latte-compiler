@@ -13,6 +13,8 @@ module Utils (
 
     printType, printArgsInFun, printAlloca, printStore, printLoad, printCall, 
     printIf, printIfElse, printWhile, printBitcast, printConsts, printXor,
+    printLazyAndFir, printLazyAndSec, printPhi, printLazyOrFir, printMul,
+    printAddInt, printCallStrConcat,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -176,10 +178,10 @@ printLoad :: String -> (Type Liner) -> String -> String
 printLoad newRegister type_ locReg = "\t" ++ newRegister ++ " = load " ++ 
     printType type_ ++ ", " ++ (printType type_) ++ "* " ++ locReg ++ "\n"
 
-printCall :: (Type Liner) -> Int -> String -> [((Type Liner), String)] -> String
+printCall :: (Type Liner) -> String -> String -> [((Type Liner), String)] -> String
 printCall type_ reg id arr = case type_ of
     Void _ -> "\tcall " ++ printType type_ ++ " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
-    _ -> "\t%" ++ show reg ++ " = call " ++ printType type_ ++
+    _ -> "\t" ++ reg ++ " = call " ++ printType type_ ++
         " @" ++ id ++ "(" ++ printCallArgs arr ++ ")\n" 
 
 printCallArgs :: [((Type Liner), String)] -> String
@@ -231,12 +233,52 @@ printWhile expCode conditionLabel whileLabel afterLabel brReg val inWhile =
 printConsts :: M.Map String String -> String
 printConsts map_ = M.foldlWithKey addNewConst "" map_
 
-addNewConst :: String -> String -> String -> String
+addNewConst :: String -> String -> String -> String 
 addNewConst acc value key = acc ++ "@" ++ key ++ " = private constant [" ++ 
     show (length (stringWithoutQ value) + 1) ++ " x i8] c\"" ++ stringWithoutQ value 
     ++ "\\00\"" ++ "\n"
 
+stringWithoutQ :: String -> String
 stringWithoutQ str = reverse $ tail $ reverse $ tail str
 
 printXor :: String -> String -> String
 printXor res reg1 = "\t" ++ res ++ " = xor i1 true, " ++ reg1 ++ "\n"
+
+printLazyAndFir :: String -> String -> String -> String -> String -> String -> String
+printLazyAndFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel = 
+    printGoto exp1Label ++ printLabel exp1Label ++ exp1Code ++ 
+    printBr helpReg1 resExp1Reg exp2Label afterLabel
+
+printLazyAndSec :: String -> String -> String -> String -> String 
+printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel = 
+    printLabel exp2Label ++ exp2Code ++ printGoto afterLabel ++ printLabel afterLabel
+
+printPhi :: String -> String -> String -> String -> String -> String
+printPhi res label1 label2 reg1 reg2 = "\t" ++ res ++ " = phi i1 [" ++ reg1 ++
+    ", %" ++ label1 ++ "], [" ++ reg2 ++ ", %" ++ label2 ++ "]\n"
+
+printLazyOrFir :: String -> String -> String -> String -> String -> String -> String
+printLazyOrFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel = 
+    printGoto exp1Label ++ printLabel exp1Label ++ exp1Code ++ 
+    printBr helpReg1 resExp1Reg afterLabel exp2Label
+
+printMul :: String -> (MulOp Liner) -> String -> String -> String
+printMul resReg mulOp resExp1Reg resExp2Reg = "\t" ++ resReg ++ " = " ++ 
+    printMulOp mulOp ++ " i32 " ++ resExp1Reg ++ ", " ++ resExp2Reg ++ "\n"
+
+printMulOp :: (MulOp Liner) -> String 
+printMulOp (Times _) = "mul"
+printMulOp (Div _) = "sdiv"
+printMulOp (Mod _) = "srem"
+
+printAddInt :: String -> (AddOp Liner) -> String -> String -> String
+printAddInt resReg addOp resExp1Reg resExp2Reg = "\t" ++ resReg ++ " = " ++ 
+    printAddOp addOp ++ " i32 " ++ resExp1Reg ++ ", " ++ resExp2Reg ++ "\n"
+
+printAddOp :: (AddOp Liner) -> String
+printAddOp (Plus _) = "add"
+printAddOp (Minus _) = "sub"
+
+printCallStrConcat :: String -> String -> String -> String 
+printCallStrConcat res arg1 arg2 = "\t" ++ res ++ " = call i8* @concat(i8* " ++
+    arg1 ++ ", i8* " ++ arg2 ++ ")\n" 

@@ -90,7 +90,7 @@ generateStmt (Decl _ t items) = foldM (generateDeclVar t) "" items
 generateStmt (Ass _ i@(Ident id) exp) = do
     (type_, register) <- findVar i
     (code, _, res) <- generateExpr exp
-    return $ printStore type_ res register    
+    return $ code ++ printStore type_ res register    
 generateStmt (Incr _ i) = generateStmt (Ass Nothing i (EAdd Nothing 
     (EVar Nothing i) (Plus Nothing) (ELitInt Nothing 1)))
 generateStmt (Decr _ i) = generateStmt (Ass Nothing i (EAdd Nothing 
@@ -167,9 +167,8 @@ generateExpr (EApp _ ident@(Ident i) exprs) = do
     case res of 
         Just (types, ret_typ) -> do
             (preCode, inCode) <- foldM generateCallArgs ("", []) exprs
-            newRegister <- takeNewRegister
-            return (preCode ++ printCall ret_typ newRegister i inCode, ret_typ, 
-                "%" ++ show newRegister)            
+            newRegister <- giveNewVarRegister
+            return (preCode ++ printCall ret_typ newRegister i inCode, ret_typ, newRegister)            
 generateExpr (EString _ str) = do
     reg1 <- giveNewVarRegister
     regWithString <- addNewStringConstant str
@@ -179,10 +178,53 @@ generateExpr (Not _ expr) = do
     (code , _, reg2) <- generateExpr expr
     reg1 <- giveNewVarRegister
     return (code ++ printXor reg1 reg2 , (Bool Nothing), reg1)
+generateExpr (EMul _ exp1 mulOp exp2) = do
+    (exp1Code, _, resExp1Reg) <- generateExpr exp1
+    (exp2Code, _, resExp2Reg) <- generateExpr exp2
+    resReg <- giveNewVarRegister
+    return (exp1Code ++ exp2Code ++ printMul resReg mulOp resExp1Reg resExp2Reg, 
+        (Int Nothing), resReg)
+generateExpr (EAdd _ exp1 op@(Minus _) exp2) = do
+    (exp1Code, _, resExp1Reg) <- generateExpr exp1
+    (exp2Code, _, resExp2Reg) <- generateExpr exp2
+    resReg <- giveNewVarRegister
+    return (exp1Code ++ exp2Code ++ printAddInt resReg op resExp1Reg resExp2Reg, 
+        (Int Nothing), resReg)
+generateExpr (EAdd _ exp1 op exp2) = do
+    (exp1Code, type_, resExp1Reg) <- generateExpr exp1
+    (exp2Code, _, resExp2Reg) <- generateExpr exp2
+    resReg <- giveNewVarRegister
+    case type_ of 
+        Str _ -> return (exp1Code ++ exp2Code ++ printCallStrConcat resReg resExp1Reg resExp2Reg,  
+            (Str Nothing), resReg)
+        Int _ -> return (exp1Code ++ exp2Code ++ printAddInt resReg op resExp1Reg resExp2Reg, 
+            (Int Nothing), resReg)  
+
+generateExpr (EAnd _ expr1 expr2) = do
+    exp1Label <- giveNewLabel
+    exp2Label <- giveNewLabel
+    afterLabel <- giveNewLabel
+    (exp1Code, _, resExp1Reg) <- generateExpr expr1
+    helpReg1 <- giveNewVarRegister
+    (exp2Code, _, resExp2Reg) <- generateExpr expr2
+    resRegister <- giveNewVarRegister
+    return (printLazyAndFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel ++
+        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel ++
+        printPhi resRegister exp1Label exp2Label helpReg1 resExp2Reg, (Bool Nothing), resRegister)
+generateExpr (EOr _ expr1 expr2) = do
+    exp1Label <- giveNewLabel
+    exp2Label <- giveNewLabel
+    afterLabel <- giveNewLabel
+    (exp1Code, _, resExp1Reg) <- generateExpr expr1
+    helpReg1 <- giveNewVarRegister
+    (exp2Code, _, resExp2Reg) <- generateExpr expr2
+    resRegister <- giveNewVarRegister
+    return (printLazyOrFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel ++
+        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel ++
+        printPhi resRegister exp1Label exp2Label helpReg1 resExp2Reg, (Bool Nothing), resRegister)    
 
 generateCallArgs :: (String, [((Type Liner), String)]) -> (Expr Liner) -> 
     Code (String, [((Type Liner), String)]) Liner
 generateCallArgs (acc1, acc2) exp = do
     (code, type_, res) <- generateExpr exp
     return (acc1 ++ code, acc2 ++ [(type_, res)])
-

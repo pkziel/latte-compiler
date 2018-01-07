@@ -270,14 +270,14 @@ infer (ERel line e1 (NE _) e2) = do
     type2 <- infer e2
     case (sameType type1 type2) of
         True -> return (Bool Nothing)
-        False -> fail $ "Both left and right expression has to be same != exp" 
+        False -> fail $ "Both left and right expression has to be same in != exp" 
             ++ (addLine line)
 infer (ERel line e1 _ e2) = do    
     type1 <- infer e1
     type2 <- infer e2
     case (isInt type1 && isInt type2) of
         True -> return (Bool Nothing)
-        False -> fail $ "Both left and right expression has to be int <,<=,>,=> exps" 
+        False -> fail $ "Both left and right expression has to be int in <,<=,>,=> exps" 
             ++ (addLine line)
 
 checkFunctionArgs:: [Type Liner] -> [Expr Liner] -> String -> Liner -> Mem () Liner

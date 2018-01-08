@@ -1,6 +1,4 @@
 int main() {
-	int i = 0;
-	i++;
 	printInt(fac(10));
 	printInt(rfac(10));
 	printInt(mfac(10));

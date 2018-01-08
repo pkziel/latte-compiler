@@ -14,7 +14,7 @@ module Utils (
     printType, printArgsInFun, printAlloca, printStore, printLoad, printCall, 
     printIf, printIfElse, printWhile, printBitcast, printConsts, printXor,
     printLazyAndFir, printLazyAndSec, printPhi, printLazyOrFir, printMul,
-    printAddInt, printCallStrConcat,
+    printAddInt, printCallStrConcat, printIntRel,
 
     Liner, VStore, FEnv, VEnv, Mem
 ) where
@@ -239,19 +239,29 @@ addNewConst acc value key = acc ++ "@" ++ key ++ " = private constant [" ++
     ++ "\\00\"" ++ "\n"
 
 stringWithoutQ :: String -> String
-stringWithoutQ str = reverse $ tail $ reverse $ tail str
+stringWithoutQ str = 
+    case (length str > 2) of
+        True -> reverse $ tail $ reverse $ tail str
+        False -> ""
 
 printXor :: String -> String -> String
 printXor res reg1 = "\t" ++ res ++ " = xor i1 true, " ++ reg1 ++ "\n"
 
 printLazyAndFir :: String -> String -> String -> String -> String -> String -> String
 printLazyAndFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel = 
-    printGoto exp1Label ++ printLabel exp1Label ++ exp1Code ++ 
+    printGoto exp1Label ++ 
+    printLabel exp1Label ++ 
+    exp1Code ++ 
     printBr helpReg1 resExp1Reg exp2Label afterLabel
 
-printLazyAndSec :: String -> String -> String -> String -> String 
-printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel = 
-    printLabel exp2Label ++ exp2Code ++ printGoto afterLabel ++ printLabel afterLabel
+printLazyAndSec :: String -> String -> String -> String -> String -> String 
+printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel middleLabel = 
+    printLabel exp2Label ++ 
+    exp2Code ++ 
+    printGoto middleLabel ++ 
+    printLabel middleLabel ++
+    printGoto afterLabel ++ 
+    printLabel afterLabel
 
 printPhi :: String -> String -> String -> String -> String -> String
 printPhi res label1 label2 reg1 reg2 = "\t" ++ res ++ " = phi i1 [" ++ reg1 ++
@@ -281,4 +291,16 @@ printAddOp (Minus _) = "sub"
 
 printCallStrConcat :: String -> String -> String -> String 
 printCallStrConcat res arg1 arg2 = "\t" ++ res ++ " = call i8* @concat(i8* " ++
-    arg1 ++ ", i8* " ++ arg2 ++ ")\n" 
+    arg1 ++ ", i8* " ++ arg2 ++ ")\n"
+
+printIntRel :: String -> (RelOp Liner) -> (Type Liner) -> String -> String -> String 
+printIntRel res op type_ left right = "\t" ++ res ++ " = icmp " ++ printOp op ++
+    " " ++ printType type_ ++ " " ++ left ++ ", " ++ right ++ "\n"
+
+printOp :: (RelOp Liner) -> String
+printOp (LTH _) = "slt"
+printOp (LE _) = "sle"
+printOp (GTH _) = "sgt"
+printOp (GE _) = "sge"
+printOp (EQU _) = "eq"
+printOp (NE _) = "ne"

@@ -29,8 +29,10 @@ compile s = case pProgram (myLexer s) of
     Bad err -> throwMyError err
     Ok tree -> do
         fenv <- typeCheck tree
+        throwMySuccess
         (consts, _, generatedCode) <- generateCode fenv tree
         putStr $ (printConsts consts) ++ "\n" ++ generatedCode
+        throwMySuccess
 
 generateCode :: (FEnv Liner) -> (Program Liner) -> IO(StringStore, Int, String)
 generateCode fenv (Program _ topDefs) = do

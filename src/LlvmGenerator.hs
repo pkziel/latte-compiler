@@ -113,7 +113,7 @@ generateStmt (CondElse _ exp stmt1 stmt2) = do
     afterLabel <- giveNewLabel
     brReg <- giveNewVarRegister
     inIf <- generateStmt stmt1
-    inElse <- generateStmt stmt1
+    inElse <- generateStmt stmt2
     return $ code ++ printIfElse ifLabel elseLabel afterLabel brReg val inIf inElse
 generateStmt (While _ exp stmt) = do
     (code, type_, val) <- generateExpr exp
@@ -131,7 +131,7 @@ generateDeclVar :: (Type Liner) -> String -> (Item Liner) -> Code String Liner
 generateDeclVar t@(Str _) v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     regWithString <- addNewStringConstant ""
-    return $ v ++ printAlloca reg1 t ++ printBitcast reg1 "xx" regWithString
+    return $ v ++ printBitcast reg1 "xx" ("@"++ regWithString)
 generateDeclVar t v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
@@ -199,29 +199,39 @@ generateExpr (EAdd _ exp1 op exp2) = do
             (Str Nothing), resReg)
         Int _ -> return (exp1Code ++ exp2Code ++ printAddInt resReg op resExp1Reg resExp2Reg, 
             (Int Nothing), resReg)  
+-- generateExpr (ERel _ exp1 (EQU _) exp2) = _
+-- generateExpr (ERel _ exp1 (EQU _) exp2) = _
+generateExpr (ERel _ exp1 op exp2) = do
+    (exp1Code, type_, resExp1Reg) <- generateExpr exp1
+    (exp2Code, _, resExp2Reg) <- generateExpr exp2
+    resReg <- giveNewVarRegister
+    return (exp1Code ++ exp2Code ++ printIntRel resReg op type_ resExp1Reg resExp2Reg , 
+        (Bool Nothing), resReg)
 
 generateExpr (EAnd _ expr1 expr2) = do
     exp1Label <- giveNewLabel
     exp2Label <- giveNewLabel
     afterLabel <- giveNewLabel
+    middleLabel <- giveNewLabel
     (exp1Code, _, resExp1Reg) <- generateExpr expr1
     helpReg1 <- giveNewVarRegister
     (exp2Code, _, resExp2Reg) <- generateExpr expr2
     resRegister <- giveNewVarRegister
     return (printLazyAndFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel ++
-        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel ++
-        printPhi resRegister exp1Label exp2Label helpReg1 resExp2Reg, (Bool Nothing), resRegister)
+        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel middleLabel++
+        printPhi resRegister exp1Label middleLabel helpReg1 resExp2Reg, (Bool Nothing), resRegister)
 generateExpr (EOr _ expr1 expr2) = do
     exp1Label <- giveNewLabel
     exp2Label <- giveNewLabel
     afterLabel <- giveNewLabel
+    middleLabel <- giveNewLabel
     (exp1Code, _, resExp1Reg) <- generateExpr expr1
     helpReg1 <- giveNewVarRegister
     (exp2Code, _, resExp2Reg) <- generateExpr expr2
     resRegister <- giveNewVarRegister
     return (printLazyOrFir exp1Label exp1Code resExp1Reg helpReg1 exp2Label afterLabel ++
-        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel ++
-        printPhi resRegister exp1Label exp2Label helpReg1 resExp2Reg, (Bool Nothing), resRegister)    
+        printLazyAndSec exp2Label exp2Code resExp2Reg afterLabel middleLabel ++
+        printPhi resRegister exp1Label middleLabel helpReg1 resExp2Reg, (Bool Nothing), resRegister)    
 
 generateCallArgs :: (String, [((Type Liner), String)]) -> (Expr Liner) -> 
     Code (String, [((Type Liner), String)]) Liner

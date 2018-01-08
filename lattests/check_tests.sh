@@ -36,7 +36,7 @@ let "rr = 65 - $counter"
 
 echo
 echo Testy bad '-->' '('poprawne/wszystkie')' $rr / 65
-echo Testy good '-->' '('poprawne/wszystkie')' $counter1 / 22
+echo Testy good '-->' '('poprawne/wszystkie')' $counter1 / 37
 
 rm -f lattests/bad/*.ll
 rm -f lattests/bad/*.bc

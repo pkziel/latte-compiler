@@ -10,7 +10,6 @@ import Control.Monad.Reader
 import AbsLatte
 import Utils
 
--- type ConstMap = M.Map String String
 type VarEnv a = M.Map Ident ((Type a), String)
 type VarStore a = [VarEnv a]
 type StringStore = M.Map String String
@@ -198,16 +197,13 @@ generateExpr (EAdd _ exp1 op exp2) = do
         Str _ -> return (exp1Code ++ exp2Code ++ printCallStrConcat resReg resExp1Reg resExp2Reg,  
             (Str Nothing), resReg)
         Int _ -> return (exp1Code ++ exp2Code ++ printAddInt resReg op resExp1Reg resExp2Reg, 
-            (Int Nothing), resReg)  
--- generateExpr (ERel _ exp1 (EQU _) exp2) = _
--- generateExpr (ERel _ exp1 (EQU _) exp2) = _
+            (Int Nothing), resReg)
 generateExpr (ERel _ exp1 op exp2) = do
     (exp1Code, type_, resExp1Reg) <- generateExpr exp1
     (exp2Code, _, resExp2Reg) <- generateExpr exp2
     resReg <- giveNewVarRegister
     return (exp1Code ++ exp2Code ++ printIntRel resReg op type_ resExp1Reg resExp2Reg , 
         (Bool Nothing), resReg)
-
 generateExpr (EAnd _ expr1 expr2) = do
     exp1Label <- giveNewLabel
     exp2Label <- giveNewLabel

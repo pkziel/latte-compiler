@@ -1,5 +1,3 @@
--- read top -> bottom
-
 module TypeChecker (
     typeCheck, getFunctionsDef
 ) where

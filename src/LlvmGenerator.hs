@@ -131,7 +131,7 @@ generateDeclVar :: (Type Liner) -> String -> (Item Liner) -> Code String Liner
 generateDeclVar t@(Str _) v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     regWithString <- addNewStringConstant ""
-    return $ v ++ printBitcast reg1 "xx" ("@"++ regWithString)
+    return $ v ++ printBitcast reg1 "__" ("@"++ regWithString)
 generateDeclVar t v (NoInit _ i@(Ident id)) = do
     reg1 <- giveNewVarRegister
     insertNewVariable i t reg1
